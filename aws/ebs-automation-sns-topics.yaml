@@ -9,7 +9,7 @@ Parameters:
   KmsKeySnsTopicsArn:
     Description: 'KMS Key Arn for SNS Topics'
     Type: AWS::SSM::Parameter::Value<String>
-    Default: '/ebs-automation/kms-key-arn/sns-topics'
+    Default: '/ebs-automation/kms-key-arn/ebs-automation-sns-topics'
 
 Resources:
   # SNS Topic - EBS Automation

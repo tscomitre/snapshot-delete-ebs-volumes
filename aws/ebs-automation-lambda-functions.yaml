@@ -3,22 +3,6 @@ Transform: 'AWS::Serverless-2016-10-31'
 Description: 'Creates Lambda Functions of EBS Automation'
 
 Parameters:
-  VpcId:
-    Description: 'VPC ID'
-    Type: 'AWS::EC2::VPC::Id'
-    Default: 'vpc-xxxxxxxxxxxxxxxxx'
-  VpcSubnetIds:
-    Description: 'Subnet IDs of VPC'
-    Type: 'List<AWS::EC2::Subnet::Id>'
-    Default: 'subnet-xxxxxxxxxxxxxxxxx, subnet-xxxxxxxxxxxxxxxxx, subnet-xxxxxxxxxxxxxxxxx'
-  EbsAutomationSecurityGroupDescription:
-    Description: 'Security Group description for Lambda Functions'
-    Type: 'String'
-    Default: 'Common Security Group for EBS Automation Lambda Functions'
-  EbsAutomationSecurityGroupName:
-    Description: 'Security Group name for EBS Automation Lambda Functions'
-    Type: 'String'
-    Default: 'ebs-automation-security-group'
   EbsVolumesTableName:
     Description: 'DynamoDB Table Name for EBS Volumes'
     Type: 'String'
@@ -87,22 +71,8 @@ Globals:
       Variables:
         LOG_LEVEL: 'INFO'
     KmsKeyArn: !Ref 'KmsKeyLambdaFunctionsArn'
-    VpcConfig:
-      SecurityGroupIds:
-        - !Ref 'EbsAutomationSecurityGroup'
-      SubnetIds: !Ref 'VpcSubnetIds'
 
 Resources:
-  # Security Group for Lambda Functions
-  EbsAutomationSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: !Ref 'EbsAutomationSecurityGroupDescription'
-      Tags:
-        - Key: 'Name'
-          Value: !Ref 'EbsAutomationSecurityGroupName'
-      VpcId: !Ref 'VpcId'
-
   # Lambda Function - List Accounts
   ListAccountsLambdaFunction:
     Type: AWS::Serverless::Function
@@ -143,6 +113,9 @@ Resources:
     Type: AWS::SNS::Subscription
     Properties:
       Endpoint: !GetAtt 'ListAvailableVolumesLambdaFunction.Arn'
+      FilterPolicy:
+        ebs_action:
+          - 'list_volumes'
       Protocol: 'lambda'
       Region: !Sub '${AWS::Region}'
       TopicArn: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${EbsAutomationTopicName}'
@@ -175,6 +148,9 @@ Resources:
     Type: AWS::SNS::Subscription
     Properties:
       Endpoint: !GetAtt 'SnapshotVolumesLambdaFunction.Arn'
+      FilterPolicy:
+        ebs_action:
+          - 'snap_volumes'
       Protocol: 'lambda'
       Region: !Sub '${AWS::Region}'
       TopicArn: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${EbsAutomationTopicName}'
@@ -204,6 +180,9 @@ Resources:
     Type: AWS::SNS::Subscription
     Properties:
       Endpoint: !GetAtt 'DeleteVolumesLambdaFunction.Arn'
+      FilterPolicy:
+        ebs_action:
+          - 'delete_volumes'
       Protocol: 'lambda'
       Region: !Sub '${AWS::Region}'
       TopicArn: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${EbsAutomationTopicName}'
