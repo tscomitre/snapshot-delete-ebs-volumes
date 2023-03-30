@@ -1,0 +1,230 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: 'Creates Lambda Functions of EBS Automation'
+
+Parameters:
+  VpcId:
+    Description: 'VPC ID'
+    Type: 'AWS::EC2::VPC::Id'
+    Default: 'vpc-xxxxxxxxxxxxxxxxx'
+  VpcSubnetIds:
+    Description: 'Subnet IDs of VPC'
+    Type: 'List<AWS::EC2::Subnet::Id>'
+    Default: 'subnet-xxxxxxxxxxxxxxxxx, subnet-xxxxxxxxxxxxxxxxx, subnet-xxxxxxxxxxxxxxxxx'
+  EbsAutomationSecurityGroupDescription:
+    Description: 'Security Group description for Lambda Functions'
+    Type: 'String'
+    Default: 'Common Security Group for EBS Automation Lambda Functions'
+  EbsAutomationSecurityGroupName:
+    Description: 'Security Group name for EBS Automation Lambda Functions'
+    Type: 'String'
+    Default: 'ebs-automation-security-group'
+  EbsVolumesTableName:
+    Description: 'DynamoDB Table Name for EBS Volumes'
+    Type: 'String'
+    Default: 'ebs-automation-volumes'
+  ListAccountsLambdaFunctionDescription:
+    Description: 'Lambda Function description for List Accounts'
+    Type: 'String'
+    Default: 'List all AWS Accounts of the AWS Organization'
+  ListAccountsLambdaFunctionName:
+    Description: 'Lambda Function name for List Accounts'
+    Type: 'String'
+    Default: 'ebs-automation-list-accounts'
+  ListAvailableVolumesLambdaFunctionDescription:
+    Description: 'Lambda Function description for List Available Volumes'
+    Type: 'String'
+    Default: 'List Available/Unattached Volumes of an AWS Account'
+  ListAvailableVolumesLambdaFunctionName:
+    Description: 'Lambda Function name for List Available Volumes'
+    Type: 'String'
+    Default: 'ebs-automation-list-available-volumes'
+  SnapshotVolumesLambdaFunctionDescription:
+    Description: 'Lambda Function description for Snapshot Volumes'
+    Type: 'String'
+    Default: 'Create a snapshot of a given EBS Volume'
+  SnapshotVolumesLambdaFunctionName:
+    Description: 'Lambda Function name for Snapshot Volumes'
+    Type: 'String'
+    Default: 'ebs-automation-snapshot-volumes'
+  DeleteVolumesLambdaFunctionDescription:
+    Description: 'Lambda Function description for Delete Volumes'
+    Type: 'String'
+    Default: 'Delete a given EBS Volume'
+  DeleteVolumesLambdaFunctionName:
+    Description: 'Lambda Function name for Delete Volumes'
+    Type: 'String'
+    Default: 'ebs-automation-delete-volumes'
+  CodeBucket:
+    Description: 'EBS Automation - S3 Bucket Artifacts'
+    Type: 'String'
+    Default: 'ebs-automation-artifacts'
+  EbsAutomationTopicName:
+    Description: 'SNS Topic Name for EBS Automation'
+    Type: 'String'
+    Default: 'ebs-automation-topic'
+  KmsKeyLambdaFunctionsArn:
+    Description: 'KMS Key Arn for Lambda Functions'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: '/ebs-automation/kms-key-arn/ebs-automation-lambda-functions'
+  LambdaArtifactVersion:
+    Description: 'EBS Automation - Artifact Zip file for Lambdas'
+    Type: 'String'
+    Default: 'ebs-automation-0.1.zip'
+
+Globals:
+  Function:
+    # Properties of AWS::Serverless::Function
+    Architectures:
+      - 'arm64'
+    Runtime: 'python3.9'
+    CodeUri:
+      Bucket: !Ref 'CodeBucket'
+      Key: !Ref 'LambdaArtifactVersion'
+    MemorySize: 128
+    Timeout: 900
+    Environment:
+      Variables:
+        LOG_LEVEL: 'INFO'
+    KmsKeyArn: !Ref 'KmsKeyLambdaFunctionsArn'
+    VpcConfig:
+      SecurityGroupIds:
+        - !Ref 'EbsAutomationSecurityGroup'
+      SubnetIds: !Ref 'VpcSubnetIds'
+
+Resources:
+  # Security Group for Lambda Functions
+  EbsAutomationSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Ref 'EbsAutomationSecurityGroupDescription'
+      Tags:
+        - Key: 'Name'
+          Value: !Ref 'EbsAutomationSecurityGroupName'
+      VpcId: !Ref 'VpcId'
+
+  # Lambda Function - List Accounts
+  ListAccountsLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: !Ref 'ListAccountsLambdaFunctionDescription'
+      FunctionName: !Ref 'ListAccountsLambdaFunctionName'
+      Handler: 'handlers/list-accounts.main_handler'
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/ebs-automation/${ListAccountsLambdaFunctionName}'
+      Environment:
+        Variables:
+          EBS_AUTOMATION_TOPIC_ARN: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${EbsAutomationTopicName}'
+
+  # Lambda Function - List Available Volumes
+  ListAvailableVolumesLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: !Ref 'ListAvailableVolumesLambdaFunctionDescription'
+      FunctionName: !Ref 'ListAvailableVolumesLambdaFunctionName'
+      Handler: 'handlers/list-available-volumes.main_handler'
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/ebs-automation/${ListAvailableVolumesLambdaFunctionName}'
+      Environment:
+        Variables:
+          EBS_AUTOMATION_TOPIC_ARN: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${EbsAutomationTopicName}'
+
+  # Lambda Permission - Lambda Function - List Available Volumes
+  ListAvailableVolumesLambdaPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - 'ListAvailableVolumesLambdaFunction'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref 'ListAvailableVolumesLambdaFunction'
+      Principal: 'sns.amazonaws.com'
+      SourceArn: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${EbsAutomationTopicName}'
+
+  # SNS Subscription - Lambda Function - List Available Volumes
+  ListAvailableVolumesSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !GetAtt 'ListAvailableVolumesLambdaFunction.Arn'
+      Protocol: 'lambda'
+      Region: !Sub '${AWS::Region}'
+      TopicArn: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${EbsAutomationTopicName}'
+
+  # Lambda Function - Snapshot Volumes
+  SnapshotVolumesLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: !Ref 'SnapshotVolumesLambdaFunctionDescription'
+      FunctionName: !Ref 'SnapshotVolumesLambdaFunctionName'
+      Handler: 'handlers/snapshot-volumes.main_handler'
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/ebs-automation/${SnapshotVolumesLambdaFunctionName}'
+      Environment:
+        Variables:
+          EBS_AUTOMATION_TOPIC_ARN: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${EbsAutomationTopicName}'
+
+  # Lambda Permission - Lambda Function - Snapshot Volumes
+  SnapshotVolumesLambdaPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - 'SnapshotVolumesLambdaFunction'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref 'SnapshotVolumesLambdaFunction'
+      Principal: 'sns.amazonaws.com'
+      SourceArn: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${EbsAutomationTopicName}'
+
+  # SNS Subscription - Lambda Function - Snapshot Volumes
+  SnapshotVolumesSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !GetAtt 'SnapshotVolumesLambdaFunction.Arn'
+      Protocol: 'lambda'
+      Region: !Sub '${AWS::Region}'
+      TopicArn: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${EbsAutomationTopicName}'
+
+  # Lambda Function - Delete Volumes
+  DeleteVolumesLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: !Ref 'DeleteVolumesLambdaFunctionDescription'
+      FunctionName: !Ref 'DeleteVolumesLambdaFunctionName'
+      Handler: 'handlers/delete-volumes.main_handler'
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/acme/${DeleteVolumesLambdaFunctionName}'
+
+  # Lambda Permission - Lambda Function - Delete Volumes
+  DeleteVolumesLambdaPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - 'DeleteVolumesLambdaFunction'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref 'DeleteVolumesLambdaFunction'
+      Principal: 'sns.amazonaws.com'
+      SourceArn: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${EbsAutomationTopicName}'
+
+  # SNS Subscription - Lambda Function - Delete Volumes
+  DeleteVolumesSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint: !GetAtt 'DeleteVolumesLambdaFunction.Arn'
+      Protocol: 'lambda'
+      Region: !Sub '${AWS::Region}'
+      TopicArn: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${EbsAutomationTopicName}'
+
+Outputs:
+  # Lambda Function Name - List Accounts
+  ListAccountsLambdaFunctionName:
+    Description: 'A reference to the List Accounts Lambda Function Name'
+    Value: !Ref 'ListAccountsLambdaFunction'
+
+  # Lambda Function Name - List Available Volumes
+  ListAvailableVolumesLambdaFunctionName:
+    Description: 'A reference to the List Available Volumes Lambda Function Name'
+    Value: !Ref 'ListAvailableVolumesLambdaFunction'
+
+  # Lambda Function Name - Snapshot Volumes
+  SnapshotVolumesLambdaFunctionName:
+    Description: 'A reference to the Snapshot Volumes Lambda Function Name'
+    Value: !Ref 'SnapshotVolumesLambdaFunction'
+
+  # Lambda Function Name - Delete Volumes
+  DeleteVolumesLambdaFunctionName:
+    Description: 'A reference to the Delete Volumes Lambda Function Name'
+    Value: !Ref 'DeleteVolumesLambdaFunction'

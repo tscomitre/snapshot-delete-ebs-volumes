@@ -1,0 +1,354 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Creates KMS Keys for encryption of EBS Automation'
+
+Parameters:
+  KmsKeyDdbTablesAliasName:
+    Description: 'KMS Key Alias Name for DynamoDB Tables'
+    Type: 'String'
+    Default: 'ebs-automation-ddb-tables'
+  KmsKeyLambdaFunctionsAliasName:
+    Description: 'KMS Key Alias Name for Lambda Functions'
+    Type: 'String'
+    Default: 'ebs-automation-lambda-functions'
+  KmsKeyS3ArtifactsAliasName:
+    Description: 'KMS Key Alias Name for Artifacts S3 Bucket'
+    Type: 'String'
+    Default: 'ebs-automation-artifacts'
+  KmsKeySnsTopicsAliasName:
+    Description: 'KMS Key Alias Name for SNS Topics'
+    Type: 'String'
+    Default: 'ebs-automation-sns-topics'
+  SsmParametersPrefix:
+    Description: 'AWS SSM Parameters Prefix for KMS Keys Arn'
+    Type: 'String'
+    Default: '/ebs-automation/kms-key-arn'
+
+Resources:
+  # KMS Key - DynamoDB Tables
+  KmsKeyDdbTables:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: 'KMS Key for encryption of DynamoDB Tables'
+      Enabled: 'true'
+      EnableKeyRotation: 'true'
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: !Ref 'KmsKeyDdbTablesAliasName'
+        Statement:
+          - Sid: 'Allow access for Key Administrators'
+            Effect: 'Allow'
+            Principal:
+              AWS:
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action:
+              - 'kms:Create*'
+              - 'kms:Describe*'
+              - 'kms:Enable*'
+              - 'kms:List*'
+              - 'kms:Put*'
+              - 'kms:Update*'
+              - 'kms:Revoke*'
+              - 'kms:Disable*'
+              - 'kms:Get*'
+              - 'kms:Delete*'
+              - 'kms:TagResource'
+              - 'kms:UntagResource'
+              - 'kms:ScheduleKeyDeletion'
+              - 'kms:CancelKeyDeletion'
+            Resource: '*'
+          - Sid: 'Allow use of the key'
+            Effect: 'Allow'
+            Principal:
+              AWS:
+                #- !Sub 'arn:aws:iam::${AWS::AccountId}:role/ebs-automation/role-name'
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action:
+              - 'kms:Encrypt'
+              - 'kms:Decrypt'
+              - 'kms:ReEncrypt*'
+              - 'kms:GenerateDataKey*'
+              - 'kms:DescribeKey'
+            Resource: '*'
+          - Sid: 'Allow attachment of persistent resources'
+            Effect: 'Allow'
+            Principal:
+              AWS:
+                #- !Sub 'arn:aws:iam::${AWS::AccountId}:role/ebs-automation/role-name'
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action:
+              - 'kms:CreateGrant'
+              - 'kms:ListGrants'
+              - 'kms:RevokeGrant'
+            Resource: '*'
+            Condition:
+              Bool:
+                kms:GrantIsForAWSResource: true
+
+  # KMS Key Alias - DynamoDB Tables
+  KmsKeyDdbTablesAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/${KmsKeyDdbTablesAliasName}'
+      TargetKeyId: !Ref 'KmsKeyDdbTables'
+
+  # SSM Parameter for KMS Key Arn - DynamoDB Tables
+  SsmParameterKmsKeyDdbTablesArn:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: 'KMS Key Arn for DynamoDB Tables'
+      Name: !Sub '${SsmParametersPrefix}/${KmsKeyDdbTablesAliasName}'
+      Tier: 'Standard'
+      Type: 'String'
+      Value: !GetAtt 'KmsKeyDdbTables.Arn'
+
+  # KMS Key - Lambda Functions
+  KmsKeyLambdaFunctions:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: 'KMS Key for encryption of Lambda Functions'
+      Enabled: 'true'
+      EnableKeyRotation: 'true'
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: !Ref 'KmsKeyLambdaFunctionsAliasName'
+        Statement:
+          - Sid: 'Allow access for Key Administrators'
+            Effect: 'Allow'
+            Principal:
+              AWS:
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action:
+              - 'kms:Create*'
+              - 'kms:Describe*'
+              - 'kms:Enable*'
+              - 'kms:List*'
+              - 'kms:Put*'
+              - 'kms:Update*'
+              - 'kms:Revoke*'
+              - 'kms:Disable*'
+              - 'kms:Get*'
+              - 'kms:Delete*'
+              - 'kms:TagResource'
+              - 'kms:UntagResource'
+              - 'kms:ScheduleKeyDeletion'
+              - 'kms:CancelKeyDeletion'
+            Resource: '*'
+          - Sid: 'Allow use of the key'
+            Effect: 'Allow'
+            Principal:
+              AWS:
+                #- !Sub 'arn:aws:iam::${AWS::AccountId}:role/ebs-automation/role-name'
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action:
+              - 'kms:Encrypt'
+              - 'kms:Decrypt'
+              - 'kms:ReEncrypt*'
+              - 'kms:GenerateDataKey*'
+              - 'kms:DescribeKey'
+            Resource: '*'
+          - Sid: 'Allow attachment of persistent resources'
+            Effect: 'Allow'
+            Principal:
+              AWS:
+                #- !Sub 'arn:aws:iam::${AWS::AccountId}:role/ebs-automation/role-name'
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action:
+              - 'kms:CreateGrant'
+              - 'kms:ListGrants'
+              - 'kms:RevokeGrant'
+            Resource: '*'
+            Condition:
+              Bool:
+                kms:GrantIsForAWSResource: true
+
+  # KMS Key Alias - Lambda Functions
+  KmsKeyLambdaFunctionsAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/${KmsKeyLambdaFunctionsAliasName}'
+      TargetKeyId: !Ref 'KmsKeyLambdaFunctions'
+
+  # SSM Parameter for KMS Key Arn - Lambda Functions
+  SsmParameterKmsKeyLambdaFunctionsArn:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: 'KMS Key Arn for Lambda Functions'
+      Name: !Sub '${SsmParametersPrefix}/${KmsKeyLambdaFunctionsAliasName}'
+      Tier: 'Standard'
+      Type: 'String'
+      Value: !GetAtt 'KmsKeyLambdaFunctions.Arn'
+
+  # KMS Key - Artifacts S3 Bucket
+  KmsKeyS3Artifacts:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: 'KMS Key for encryption of Artifacts S3 Bucket'
+      Enabled: 'true'
+      EnableKeyRotation: 'true'
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: !Ref 'KmsKeyS3ArtifactsAliasName'
+        Statement:
+          - Sid: 'Allow access for Key Administrators'
+            Effect: 'Allow'
+            Principal:
+              AWS:
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action:
+              - 'kms:Create*'
+              - 'kms:Describe*'
+              - 'kms:Enable*'
+              - 'kms:List*'
+              - 'kms:Put*'
+              - 'kms:Update*'
+              - 'kms:Revoke*'
+              - 'kms:Disable*'
+              - 'kms:Get*'
+              - 'kms:Delete*'
+              - 'kms:TagResource'
+              - 'kms:UntagResource'
+              - 'kms:ScheduleKeyDeletion'
+              - 'kms:CancelKeyDeletion'
+            Resource: '*'
+          - Sid: 'Allow use of the key'
+            Effect: 'Allow'
+            Principal:
+              AWS:
+                #- !Sub 'arn:aws:iam::${AWS::AccountId}:role/ebs-automation/role-name'
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action:
+              - 'kms:Encrypt'
+              - 'kms:Decrypt'
+              - 'kms:ReEncrypt*'
+              - 'kms:GenerateDataKey*'
+              - 'kms:DescribeKey'
+            Resource: '*'
+          - Sid: 'Allow attachment of persistent resources'
+            Effect: 'Allow'
+            Principal:
+              AWS:
+                #- !Sub 'arn:aws:iam::${AWS::AccountId}:role/ebs-automation/role-name'
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action:
+              - 'kms:CreateGrant'
+              - 'kms:ListGrants'
+              - 'kms:RevokeGrant'
+            Resource: '*'
+            Condition:
+              Bool:
+                kms:GrantIsForAWSResource: true
+
+  # KMS Key Alias - Artifacts S3 Bucket
+  KmsKeyS3ArtifactsAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/${KmsKeyS3ArtifactsAliasName}'
+      TargetKeyId: !Ref 'KmsKeyS3Artifacts'
+
+  # SSM Parameter for KMS Key Arn - Artifacts S3 Bucket
+  SsmParameterKmsKeyS3ArtifactsArn:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: 'KMS Key Arn for Artifacts S3 Bucket'
+      Name: !Sub '${SsmParametersPrefix}/${KmsKeyS3ArtifactsAliasName}'
+      Tier: 'Standard'
+      Type: 'String'
+      Value: !GetAtt 'KmsKeyS3Artifacts.Arn'
+
+  # KMS Key - SNS Topics
+  KmsKeySnsTopics:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: 'KMS Key for encryption of SNS Topics'
+      Enabled: 'true'
+      EnableKeyRotation: 'true'
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: !Ref 'KmsKeySnsTopicsAliasName'
+        Statement:
+          - Sid: 'Allow access for Key Administrators'
+            Effect: 'Allow'
+            Principal:
+              AWS:
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action:
+              - 'kms:Create*'
+              - 'kms:Describe*'
+              - 'kms:Enable*'
+              - 'kms:List*'
+              - 'kms:Put*'
+              - 'kms:Update*'
+              - 'kms:Revoke*'
+              - 'kms:Disable*'
+              - 'kms:Get*'
+              - 'kms:Delete*'
+              - 'kms:TagResource'
+              - 'kms:UntagResource'
+              - 'kms:ScheduleKeyDeletion'
+              - 'kms:CancelKeyDeletion'
+            Resource: '*'
+          - Sid: 'Allow use of the key'
+            Effect: 'Allow'
+            Principal:
+              AWS:
+                #- !Sub 'arn:aws:iam::${AWS::AccountId}:role/ebs-automation/role-name'
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action:
+              - 'kms:Encrypt'
+              - 'kms:Decrypt'
+              - 'kms:ReEncrypt*'
+              - 'kms:GenerateDataKey*'
+              - 'kms:DescribeKey'
+            Resource: '*'
+          - Sid: 'Allow attachment of persistent resources'
+            Effect: 'Allow'
+            Principal:
+              AWS:
+                #- !Sub 'arn:aws:iam::${AWS::AccountId}:role/ebs-automation/role-name'
+                - !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action:
+              - 'kms:CreateGrant'
+              - 'kms:ListGrants'
+              - 'kms:RevokeGrant'
+            Resource: '*'
+            Condition:
+              Bool:
+                kms:GrantIsForAWSResource: true
+
+  # KMS Key Alias - SNS Topics
+  KmsKeySnsTopicsAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub 'alias/${KmsKeySnsTopicsAliasName}'
+      TargetKeyId: !Ref 'KmsKeySnsTopics'
+
+  # SSM Parameter for KMS Key Arn - SNS Topics
+  SsmParameterKmsKeySnsTopicsArn:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Description: 'KMS Key Arn for SNS Topics'
+      Name: !Sub '${SsmParametersPrefix}/${KmsKeySnsTopicsAliasName}'
+      Tier: 'Standard'
+      Type: 'String'
+      Value: !GetAtt 'KmsKeySnsTopics.Arn'
+
+Outputs:
+  # KMS Key - DynamoDB Tables
+  KmsKeyDdbTablesId:
+    Description: 'A reference to the DynamoDB Tables - KMS Key ID'
+    Value: !Ref 'KmsKeyDdbTables'
+
+  # KMS Key - Lambda Functions
+  KmsKeyLambdaFunctionsId:
+    Description: 'A reference to the Lambda Functions - KMS Key ID'
+    Value: !Ref 'KmsKeyLambdaFunctions'
+
+  # KMS Key - Artifacts S3 Bucket
+  KmsKeyS3ArtifactsId:
+    Description: 'A reference to the S3 Artifacts - KMS Key ID'
+    Value: !Ref 'KmsKeyS3Artifacts'
+
+  # KMS Key - SNS Topics
+  KmsKeySnsTopicsId:
+    Description: 'A reference to the SNS Topics - KMS Key ID'
+    Value: !Ref 'KmsKeySnsTopics'

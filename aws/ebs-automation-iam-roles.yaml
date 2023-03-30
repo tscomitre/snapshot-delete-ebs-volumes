@@ -1,0 +1,170 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Creates IAM Roles of EBS Automation'
+
+Parameters:
+  CrossAccountIamRole:
+    Description: 'IAM Cross Account Role to access the member accounts in your organization'
+    Type: 'String'
+    Default: 'OrganizationAccountAccessRole'
+  ListAccountsLambdaIamRoleName:
+    Description: 'IAM Role/Policy name for Lambda Function - List Accounts'
+    Type: 'String'
+    Default: 'ebs-automation-list-accounts'
+  ListAvailableVolumesLambdaIamRoleName:
+    Description: 'IAM Role/Policy name for Lambda Function - List Available Volumes'
+    Type: 'String'
+    Default: 'ebs-automation-list-available-volumes'
+  SnapshotVolumesLambdaIamRoleName:
+    Description: 'IAM Role/Policy name for Lambda Function - Snapshot Volumes'
+    Type: 'String'
+    Default: 'ebs-automation-snapshot-volumes'
+  DeleteVolumesLambdaIamRoleName:
+    Description: 'IAM Role/Policy name for Lambda Function - Delete Volumes'
+    Type: 'String'
+    Default: 'ebs-automation-delete-volumes'
+
+Resources:
+  # IAM Role for Lambda Function - List Accounts
+  ListAccountsLambdaIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'lambda.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Description: 'IAM Role for Lambda Function - List Accounts'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+      Path: '/ebs-automation/'
+      RoleName: !Ref 'ListAccountsLambdaIamRoleName'
+
+  # IAM Policy for Lambda Function - List Accounts
+  ListAccountsLambdaIamPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Action:
+              - 'organizations:ListAccounts'
+            Resource: '*'
+      PolicyName: !Ref 'ListAccountsLambdaIamRoleName'
+      Roles:
+        - !Ref 'ListAccountsLambdaIamRole'
+
+  # IAM Role for Lambda Function - List Available Volumes
+  ListAvailableVolumesLambdaIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'lambda.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Description: 'IAM Role for Lambda Function - List Available Volumes'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+      Path: '/ebs-automation/'
+      RoleName: !Ref 'ListAvailableVolumesLambdaIamRoleName'
+
+  # IAM Policy for Lambda Function - List Available Volumes
+  ListAvailableVolumesLambdaIamPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Action:
+              - 'sts:AssumeRole'
+            Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountIamRole}'
+          - Effect: 'Allow'
+            Action:
+              - 'ec2:DescribeVolumes'
+            Resource: '*'
+      PolicyName: !Ref 'ListAvailableVolumesLambdaIamRoleName'
+      Roles:
+        - !Ref 'ListAvailableVolumesLambdaIamRole'
+
+  # IAM Role for Lambda Function - Snapshot Volumes
+  SnapshotVolumesLambdaIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'lambda.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Description: 'IAM Role for Lambda Function - Snapshot Volumes'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+      Path: '/ebs-automation/'
+      RoleName: !Ref 'SnapshotVolumesLambdaIamRoleName'
+
+  # IAM Policy for Lambda Function - Snapshot Volumes
+  SnapshotVolumesLambdaIamPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Action:
+              - 'sts:AssumeRole'
+            Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountIamRole}'
+          - Effect: 'Allow'
+            Action:
+              - 'ec2:CreateSnapshot'
+            Resource: '*'
+      PolicyName: !Ref 'SnapshotVolumesLambdaIamRoleName'
+      Roles:
+        - !Ref 'SnapshotVolumesLambdaIamRole'
+
+  # IAM Role for Lambda Function - Delete Volumes
+  DeleteVolumesLambdaIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'lambda.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Description: 'IAM Role for Lambda Function - Delete Volumes'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+      Path: '/acme/'
+      RoleName: !Ref 'DeleteVolumesLambdaIamRoleName'
+
+  # IAM Policy for Lambda Function - Delete Volumes
+  DeleteVolumesLambdaIamPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Action:
+              - 'sts:AssumeRole'
+            Resource: !Sub 'arn:aws:iam::*:role/${CrossAccountIamRole}'
+          - Effect: 'Allow'
+            Action:
+              - 'ec2:DeleteVolume'
+            Resource: '*'
+          - Effect: 'Allow'
+            Action:
+              - 'dynamodb:GetItem'
+              - 'dynamodb:PutItem'
+            Resource: 'arn:aws:dynamodb:*:*:table/ebs-automation-volumes'
+      PolicyName: !Ref 'DeleteVolumesLambdaIamRoleName'
+      Roles:
+        - !Ref 'DeleteVolumesLambdaIamRole'

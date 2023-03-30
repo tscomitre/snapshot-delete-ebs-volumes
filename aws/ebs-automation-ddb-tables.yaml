@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Creates DynamoDB Tables of EBS Automation'
+
+Parameters:
+  EbsVolumesTableName:
+    Description: 'DynamoDB Table Name for EBS Volumes'
+    Type: 'String'
+    Default: 'ebs-automation-volumes'
+  KmsKeyDdbTablesArn:
+    Description: 'KMS Key Arn for DynamoDB Tables'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: '/ebs-automation/kms-key-arn/ebs-automation-ddb-tables'
+
+Resources:
+  # DynamoDB Table - EBS Volumes
+  EbsVolumesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: 'volume-id'
+          AttributeType: 'S'
+      BillingMode: 'PAY_PER_REQUEST'
+      KeySchema:
+        - AttributeName: 'volume-id'
+          KeyType: 'HASH'
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        KMSMasterKeyId: !Ref 'KmsKeyDdbTablesArn'
+        SSEEnabled: true
+        SSEType: 'KMS'
+      TableName: !Ref 'EbsVolumesTableName'
+
+Outputs:
+  # DynamoDB Table - EBS Volumes
+  EbsVolumesTableArn:
+    Description: 'A reference to the ARN of DynamoDB Table - EBS Volumes'
+    Value: !GetAtt 'EbsVolumesTable.Arn'
