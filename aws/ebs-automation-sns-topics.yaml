@@ -1,0 +1,26 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Creates SNS Topics for EBS Automation'
+
+Parameters:
+  EbsAutomationTopicName:
+    Description: 'SNS Topic Name for EBS Automation'
+    Type: 'String'
+    Default: 'ebs-automation-topic'
+  KmsKeySnsTopicsArn:
+    Description: 'KMS Key Arn for SNS Topics'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: '/ebs-automation/kms-key-arn/sns-topics'
+
+Resources:
+  # SNS Topic - EBS Automation
+  EbsAutomationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      KmsMasterKeyId: !Ref 'KmsKeySnsTopicsArn'
+      TopicName: !Ref 'EbsAutomationTopicName'
+
+Outputs:
+  # SNS Topic - EBS Automation
+  EbsAutomationTopicArn:
+    Description: 'A reference to the EBS Automation SNS Topic Arn'
+    Value: !Ref 'EbsAutomationTopic'

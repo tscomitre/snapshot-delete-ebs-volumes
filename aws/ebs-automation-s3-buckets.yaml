@@ -1,0 +1,42 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Creates S3 Buckets of EBS Automation'
+
+Parameters:
+  ArtifactsBucketName:
+    Description: 'S3 Bucket name for EBS Automation - Artifacts'
+    Type: 'String'
+    Default: 'ebs-automation-artifacts'
+  KmsKeyS3ArtifactsArn:
+    Description: 'KMS Key Arn for Artifacts S3 Bucket'
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: '/ebs-automation/kms-key-arn/ebs-automation-artifacts'
+
+Resources:
+  # S3 Bucket - Artifacts
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: 'Retain'
+    Properties:
+      AccessControl: 'Private'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: 'true'
+            ServerSideEncryptionByDefault:
+              KMSMasterKeyID: !Ref 'KmsKeyS3ArtifactsArn'
+              SSEAlgorithm: 'aws:kms'
+      BucketName: !Sub '${ArtifactsBucketName}'
+      VersioningConfiguration:
+        Status: 'Enabled'
+      LifecycleConfiguration:
+        Rules:
+          - Id: 'DeletionRule'
+            Status: 'Enabled'
+            NoncurrentVersionExpiration:
+              NewerNoncurrentVersions: '1'
+              NoncurrentDays: '30'
+
+Outputs:
+  # S3 Bucket - Artifacts
+  ArtifactsBucketName:
+    Description: 'A reference to the Artifacts S3 Bucket Name'
+    Value: !Ref 'ArtifactsBucket'
