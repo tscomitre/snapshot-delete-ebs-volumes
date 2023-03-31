@@ -18,6 +18,9 @@ def main_handler(event, context):
     logger.debug(f'Lambda Event: {event}')
     logger.debug(f'Lambda Context: {context}')
 
+    logger.info(f'Listing all the accounts in the AWS Organization.')
+    accounts_list = list_aws_accounts
+
     return {
         'statusCode': 200,
         'headers': {'Content-Type': 'application/json'},
