@@ -17,11 +17,11 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
-        - AttributeName: 'volume-id'
+        - AttributeName: 'VolumeId'
           AttributeType: 'S'
       BillingMode: 'PAY_PER_REQUEST'
       KeySchema:
-        - AttributeName: 'volume-id'
+        - AttributeName: 'VolumeId'
           KeyType: 'HASH'
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
