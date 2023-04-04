@@ -13,6 +13,8 @@ logger.setLevel(os.getenv('LOG_LEVEL', 'INFO').upper())
 
 # Variables
 volumes_table_name = 'ebs-automation-volumes'
+role_name = os.getenv('ROLE_NAME', 'OrganizationAccountAccessRole')
+today = str(date.today())
 
 
 def json_serial(obj):
@@ -94,7 +96,7 @@ def describe_volumes(ebs_volume):
     logger.info(f"Retrieving details for EBS Volume [{ebs_volume['VolumeId']}].")
     try:
         # Assume a Cross Account IAM Role
-        credentials = assume_role(f"arn:aws:iam::{ebs_volume['AccountId']}:role/tabcorp-superadmin")
+        credentials = assume_role(f"arn:aws:iam::{ebs_volume['AccountId']}:role/{role_name}")
         if not credentials:
             return False
 
@@ -120,18 +122,13 @@ def describe_volumes(ebs_volume):
         return False
 
 
-def create_resource(service, region=None):
+def create_resource(service):
     """
     Creates a service resource
     :param service: (string) AWS service which the resource will be created for
-    :param region: (string) AWS region where the resource will be created for
     :return: resource object
     """
-    if not region:
-        return boto3.resource(service)
-
-    else:
-        return boto3.resource(service, region_name=region)
+    return boto3.resource(service)
 
 
 def get_item(table_name, **kwargs):
@@ -149,7 +146,7 @@ def get_item(table_name, **kwargs):
     # Try to get an item from DynamoDB Table
     try:
         # Create resource Table
-        table = create_resource('dynamodb', 'ap-southeast-2').Table(table_name)
+        table = create_resource('dynamodb').Table(table_name)
 
         # Get item
         if 'range_key' not in kwargs:
@@ -198,15 +195,10 @@ def put_item(table_name, item):
         return False
 
 
-def main_handler(event, context):
+def main_handler():
     """
     Create Snapshot of an EBS Volume and Delete volume once completed
-    :param event: (dict) AWS Lambda Function event
-    :param context: (dict) AWS Lambda Function context
     """
-    logger.debug(f'Lambda Event: {event}')
-    logger.debug(f'Lambda Context: {context}')
-
     # Opening JSON file
     with open('load_volumes.json') as json_file:
         data = json.load(json_file)
@@ -215,35 +207,35 @@ def main_handler(event, context):
         for item in data:
             volume_details = describe_volumes(item)
 
+            if not volume_details:
+                logger.error(f"EBS Volume [{item['VolumeId']}] could not be described. Skipping!")
+                continue
+
             # Add EBS Volume details into DynamoDB Table
-            if volume_details:
-                print(volume_details)
+            logger.info(f"EBS Volume [{item['VolumeId']}] successfully described.")
+            logger.info(volume_details)
 
-                # Get client details from DynamoDB Table
-                volume_ddb_item = get_item(volumes_table_name, hash_key='VolumeId',
-                                           hash_value=volume_details['VolumeId'])
+            # Get EBS Volume details from DynamoDB Table
+            logger.info(f"Retrieving EBS Volume details from DynamoDB Table.")
+            volume_ddb_item = get_item(volumes_table_name, hash_key='VolumeId', hash_value=volume_details['VolumeId'])
 
-                if not volume_ddb_item:
-                    logger.warning('EBS Volume does not exist in the DynamoDB.')
-                    logger.info('Adding EBS Volume details into DynamoDB Table.')
+            if not volume_ddb_item:
+                logger.warning('EBS Volume does not exist in the DynamoDB Table.')
+                logger.info('Adding EBS Volume details into DynamoDB Table.')
 
-                    volume_details_ = json.dumps(volume_details, default=json_serial)
-                    payload = json.loads(volume_details_)
-                    payload['AccountId'] = item['AccountId']
+                volume_details_ = json.dumps(volume_details, default=json_serial)
+                payload = json.loads(volume_details_)
+                payload['AccountId'] = item['AccountId']
+                payload['date_checked'] = today
 
-                    if not put_item(volumes_table_name, payload):
-                        logger.warning('EBS Volume could not be added into DynamoDB Table.')
-                    else:
-                        logger.info('EBS Volume successfully added into DynamoDB Table.')
-
+                if not put_item(volumes_table_name, payload):
+                    logger.warning('EBS Volume could not be added into DynamoDB Table.')
                 else:
-                    logger.info('EBS Volume details already exists in DynamoDB Table. Skipping!')
+                    logger.info('EBS Volume successfully added into DynamoDB Table.')
 
-    # return {
-    #     'statusCode': 200,
-    #     'headers': {'Content-Type': 'application/json'},
-    #     'body': {'message': f'AWS Accounts successfully listed.'}
-    # }
+            else:
+                logger.info('EBS Volume details already exists in DynamoDB Table. Skipping!')
 
 
-main_handler('event', 'context')
+if __name__ == '__main__':
+    main_handler()
